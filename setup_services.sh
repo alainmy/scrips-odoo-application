@@ -21,7 +21,7 @@ NC='\033[0m'
 DOMAIN="tu-dominio.com"
 ODOO_USER="odoo"
 ODOO_PATH="/opt/odoo"
-ODOO_BIN_PATH="/opt/odoo/odoo/odoo-bin"
+ODOO_BIN_PATH=""  # Se detectará automáticamente
 VENV_PATH="/opt/odoo/venv"
 ODOO_PORT="8069"
 GEVENT_PORT="8072"
@@ -84,9 +84,15 @@ while [[ $# -gt 0 ]]; do
             echo "  --user           Usuario Odoo (defecto: odoo)"
             echo "  --odoo-path      Ruta de instalación de Odoo (defecto: /opt/odoo)"
             echo "  --venv-path      Ruta del venv (defecto: /opt/odoo/venv)"
-            echo "  --odoo-bin       Ruta de odoo-bin (defecto: /opt/odoo/odoo/odoo-bin)"
+            echo "  --odoo-bin       Ruta de odoo-bin (se detecta automáticamente si omite)"
             echo "  --odoo-port      Puerto Odoo (defecto: 8069)"
+            echo "  --gevent-port    Puerto Gevent (defecto: 8072)"
             echo "  --help           Mostrar esta ayuda"
+            echo ""
+            echo "Ejemplos:"
+            echo "  sudo ./setup_services.sh --domain ejemplo.com"
+            echo "  sudo ./setup_services.sh --domain ejemplo.com --user odoo --odoo-port 8080"
+            echo "  sudo ./setup_services.sh --domain ejemplo.com --odoo-bin /opt/odoo/odoo-bin"
             exit 0
             ;;
         *)
@@ -105,6 +111,63 @@ if [[ "$DOMAIN" == "tu-dominio.com" ]]; then
     log_error "Debes especificar un dominio válido con --domain"
     exit 1
 fi
+
+# Validaciones de rutas y archivos
+log_info "Validando rutas y archivos..."
+
+if [[ ! -d "$ODOO_PATH" ]]; then
+    log_error "Ruta de Odoo no encontrada: $ODOO_PATH"
+    exit 1
+fi
+
+# Auto-detectar la ruta de odoo-bin si no se especificó
+if [[ -z "$ODOO_BIN_PATH" ]] || [[ ! -f "$ODOO_BIN_PATH" ]]; then
+    log_info "Detectando ubicación de odoo-bin..."
+    
+    # Buscar odoo-bin en ubicaciones comunes
+    if [[ -f "$ODOO_PATH/odoo-bin" ]]; then
+        ODOO_BIN_PATH="$ODOO_PATH/odoo-bin"
+        log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
+    elif [[ -f "$ODOO_PATH/odoo/odoo-bin" ]]; then
+        ODOO_BIN_PATH="$ODOO_PATH/odoo/odoo-bin"
+        log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
+    else
+        # Buscar en cualquier subdirectorio
+        FOUND_BIN=$(find "$ODOO_PATH" -maxdepth 3 -name "odoo-bin" -type f 2>/dev/null | head -n 1)
+        if [[ -n "$FOUND_BIN" ]]; then
+            ODOO_BIN_PATH="$FOUND_BIN"
+            log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
+        else
+            log_error "No se encontró odoo-bin en $ODOO_PATH"
+            log_error "Verifica la estructura del directorio:"
+            ls -la "$ODOO_PATH" | head -n 20
+            exit 1
+        fi
+    fi
+fi
+
+if [[ ! -f "$ODOO_BIN_PATH" ]]; then
+    log_error "odoo-bin no encontrado en: $ODOO_BIN_PATH"
+    exit 1
+fi
+
+if [[ ! -d "$VENV_PATH" ]]; then
+    log_error "Virtual environment no encontrado en: $VENV_PATH"
+    exit 1
+fi
+
+if [[ ! -f "$VENV_PATH/bin/python" ]]; then
+    log_error "Python ejecutable no encontrado en: $VENV_PATH/bin/python"
+    exit 1
+fi
+
+if [[ ! -f "/etc/odoo.conf" ]]; then
+    log_error "Archivo de configuración no encontrado: /etc/odoo.conf"
+    log_error "Crea el archivo de configuración antes de continuar"
+    exit 1
+fi
+
+log_success "Todas las rutas y archivos validados"
 
 log_info "Configurando servicios de Odoo..."
 log_info "Dominio: $DOMAIN"
@@ -165,11 +228,27 @@ sudo systemctl enable odoo > /dev/null 2>&1
 log_success "Odoo habilitado en arranque"
 
 log_info "Iniciando Odoo..."
-sudo systemctl start odoo > /dev/null 2>&1
+if ! sudo systemctl start odoo 2>&1; then
+    log_error "No se pudo iniciar el servicio Odoo"
+    log_error "Verifica los logs: sudo journalctl -u odoo -n 30"
+    exit 1
+fi
 log_success "Odoo iniciado"
 
-# Esperar un poco para que Odoo inicie
-sleep 2
+# Esperar un poco para que Odoo inicie y verificar su estado
+sleep 3
+
+# Verificar si el servicio está activo
+if ! sudo systemctl is-active --quiet odoo; then
+    log_error "El servicio Odoo no se mantuvo activo"
+    log_error "Estado del servicio:"
+    sudo systemctl status odoo --no-pager || true
+    log_error "Últimos logs:"
+    sudo journalctl -u odoo -n 30 || true
+    exit 1
+fi
+
+log_success "Servicio Odoo confirmado como activo"
 
 # Crear configuración de Nginx
 log_info "Configurando Nginx como proxy reverso..."
@@ -381,7 +460,12 @@ echo "Verificación del estado:"
 echo ""
 sudo systemctl status odoo --no-pager
 echo ""
-echo "Puedes acceder a Odoo en: https://$DOMAIN"
+
+if [[ "$USE_SSL" == true ]]; then
+    echo "Puedes acceder a Odoo en: https://$DOMAIN"
+else
+    echo "Puedes acceder a Odoo en: http://$DOMAIN"
+fi
 echo ""
 log_warning "Si falta el certificado SSL, ejecuta:"
 log_warning "  sudo ./configure_nginx_ssl.sh --domain $DOMAIN --email tu-email@ejemplo.com"
