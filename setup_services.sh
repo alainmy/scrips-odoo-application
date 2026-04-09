@@ -24,7 +24,7 @@ ODOO_PATH="/opt/odoo"
 ODOO_BIN_PATH="/opt/odoo/odoo/odoo-bin"
 VENV_PATH="/opt/odoo/venv"
 ODOO_PORT="8069"
-LONGPOLLING_PORT="8072"
+GEVENT_PORT="8072"
 SSL_CERT_PATH="/etc/letsencrypt/live"
 
 log_info() {
@@ -68,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --odoo-port)
             ODOO_PORT="$2"
+            shift 2
+            ;;
+        --gevent-port)
+            GEVENT_PORT="$2"
             shift 2
             ;;
         --help)
@@ -180,9 +184,11 @@ else
     USE_SSL=false
 fi
 
-sudo tee /etc/nginx/sites-available/odoo > /dev/null <<'EOF'
+# Generar configuración de Nginx según disponibilidad de SSL
+if [[ "$USE_SSL" == true ]]; then
+    sudo tee /etc/nginx/sites-available/odoo > /dev/null <<'EOF'
 # ============================================================================
-# Configuración de Nginx para Odoo
+# Configuración de Nginx para Odoo (CON SSL)
 # ============================================================================
 # Generado automáticamente por setup_services.sh
 
@@ -191,7 +197,7 @@ upstream odoo {
 }
 
 upstream odoochat {
-    server 127.0.0.1:LONGPOLLING_PORT;
+    server 127.0.0.1:GEVENT_PORT;
 }
 
 # Redirigir HTTP a HTTPS
@@ -261,13 +267,86 @@ server {
     }
 }
 EOF
+else
+    # Configuración HTTP simple sin SSL
+    sudo tee /etc/nginx/sites-available/odoo > /dev/null <<'EOF'
+# ============================================================================
+# Configuración de Nginx para Odoo (SIN SSL - HTTP)
+# ============================================================================
+# Generado automáticamente por setup_services.sh
 
-# Reemplazar placeholders
+upstream odoo {
+    server 127.0.0.1:ODOO_PORT;
+}
+
+upstream odoochat {
+    server 127.0.0.1:GEVENT_PORT;
+}
+
+# HTTP
+server {
+    listen 80;
+    server_name DOMAIN;
+
+    # Logging
+    access_log /var/log/nginx/odoo.access.log;
+    error_log /var/log/nginx/odoo.error.log warn;
+
+    # Tamaño máximo de carga
+    client_max_body_size 100M;
+
+    # Proxy a Odoo
+    location / {
+        proxy_pass http://odoo;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+    }
+
+    # WebSocket para chat en vivo
+    location /websocket {
+        proxy_pass http://odoochat;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Longpolling
+    location /longpolling {
+        proxy_pass http://odoochat;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Caché estática
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2)$ {
+        expires 1w;
+        proxy_pass http://odoo;
+        proxy_cache_valid 200 1w;
+    }
+}
+EOF
+fi
+
+# Reemplazar placeholders comunes
 sed -i "s|DOMAIN|$DOMAIN|g" /etc/nginx/sites-available/odoo
 sed -i "s|ODOO_PORT|$ODOO_PORT|g" /etc/nginx/sites-available/odoo
-sed -i "s|LONGPOLLING_PORT|$LONGPOLLING_PORT|g" /etc/nginx/sites-available/odoo
-sed -i "s|SSL_CERT|$SSL_CERT_PATH/$DOMAIN/fullchain.pem|g" /etc/nginx/sites-available/odoo
-sed -i "s|SSL_KEY|$SSL_CERT_PATH/$DOMAIN/privkey.pem|g" /etc/nginx/sites-available/odoo
+sed -i "s|GEVENT_PORT|$GEVENT_PORT|g" /etc/nginx/sites-available/odoo
+
+# Reemplazar placeholders SSL solo si está habilitado
+if [[ "$USE_SSL" == true ]]; then
+    sed -i "s|SSL_CERT|$SSL_CERT_PATH/$DOMAIN/fullchain.pem|g" /etc/nginx/sites-available/odoo
+    sed -i "s|SSL_KEY|$SSL_CERT_PATH/$DOMAIN/privkey.pem|g" /etc/nginx/sites-available/odoo
+fi
 
 log_success "Configuración de Nginx creada"
 

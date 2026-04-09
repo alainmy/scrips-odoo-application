@@ -17,8 +17,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-DOMAIN=""
-EMAIL=""
+DOMAIN="rodferco.com"
+EMAIL="rrferrer5588@gmail.com"
 RENEW_ONLY=false
 
 log_info() {
