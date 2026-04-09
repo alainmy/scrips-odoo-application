@@ -101,7 +101,7 @@ if [[ ! $REPLY =~ ^[Ss]$ ]]; then
 fi
 
 if [[ "$TYPE" == "community" ]]; then
-    URL="https://github.com/odoo/odoo/archive/refs/tags/$VERSION.zip"
+    URL="https://codeload.github.com/odoo/odoo/zip/refs/tags/$VERSION"
     FILENAME="odoo-$VERSION.zip"
 elif [[ "$TYPE" == "enterprise" ]]; then
     log_error "Para Odoo Enterprise, descarga desde: https://www.odoo.com/my/download"
