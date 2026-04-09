@@ -19,7 +19,7 @@ NC='\033[0m'
 
 ODOO_PATH="/opt/odoo"
 ODOO_USER="odoo"
-REQUIREMENTS_FILE="odoo/requirements.txt"
+REQUIREMENTS_FILE="/opt/odoo/requirements.txt"
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
