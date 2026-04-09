@@ -102,6 +102,23 @@ sudo systemctl start postgresql > /dev/null 2>&1
 sudo systemctl enable postgresql > /dev/null 2>&1
 log_success "PostgreSQL iniciado y habilitado"
 
+log_info "Configurando autenticación de PostgreSQL..."
+# Modificar pg_hba.conf para permitir autenticación con contraseña
+PG_VERSION=$(sudo -u postgres psql --version | awk '{print $3}' | cut -d. -f1)
+PG_CONFIG_PATH="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
+
+if [[ -f "$PG_CONFIG_PATH" ]]; then
+    # Reemplazar peer con md5 para conexiones locales
+    sudo sed -i 's/^local[ \t]*all[ \t]*all[ \t]*peer/local   all             all                     md5/' "$PG_CONFIG_PATH"
+    log_success "Autenticación configurada"
+else
+    log_warning "No se encontró pg_hba.conf en $PG_CONFIG_PATH"
+fi
+
+log_info "Recargando configuración de PostgreSQL..."
+sudo systemctl reload postgresql > /dev/null 2>&1
+log_success "Configuración recargada"
+
 log_info "Creando usuario '$DB_USER' en PostgreSQL..."
 sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" > /dev/null 2>&1
 sudo -u postgres psql -c "ALTER USER $DB_USER CREATEDB;" > /dev/null 2>&1
