@@ -120,9 +120,22 @@ sudo systemctl reload postgresql > /dev/null 2>&1
 log_success "Configuración recargada"
 
 log_info "Creando usuario '$DB_USER' en PostgreSQL..."
-sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" > /dev/null 2>&1
-sudo -u postgres psql -c "ALTER USER $DB_USER CREATEDB;" > /dev/null 2>&1
-log_success "Usuario $DB_USER creado"
+# Escapar la contraseña para PostgreSQL
+ESCAPED_PASSWORD="${DB_PASSWORD//\'/\'\'}"
+
+# Crear usuario con contraseña segura
+sudo -u postgres psql <<EOF > /dev/null 2>&1
+CREATE USER $DB_USER WITH PASSWORD '$ESCAPED_PASSWORD';
+ALTER USER $DB_USER CREATEDB;
+EOF
+
+# Verificar que el usuario fue creado
+if sudo -u postgres psql -t -c "SELECT 1 FROM pg_user WHERE usename='$DB_USER'" | grep -q 1; then
+    log_success "Usuario $DB_USER creado"
+else
+    log_error "No se pudo crear el usuario $DB_USER"
+    exit 1
+fi
 
 echo ""
 log_success "PostgreSQL instalado y configurado exitosamente"
