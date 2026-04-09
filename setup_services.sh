@@ -124,7 +124,7 @@ fi
 if [[ -z "$ODOO_BIN_PATH" ]] || [[ ! -f "$ODOO_BIN_PATH" ]]; then
     log_info "Detectando ubicación de odoo-bin..."
     
-    # Buscar odoo-bin en ubicaciones comunes
+    # Buscar odoo-bin en ubicaciones comunes (en orden de preferencia)
     if [[ -f "$ODOO_PATH/odoo-bin" ]]; then
         ODOO_BIN_PATH="$ODOO_PATH/odoo-bin"
         log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
@@ -132,15 +132,16 @@ if [[ -z "$ODOO_BIN_PATH" ]] || [[ ! -f "$ODOO_BIN_PATH" ]]; then
         ODOO_BIN_PATH="$ODOO_PATH/odoo/odoo-bin"
         log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
     else
-        # Buscar en cualquier subdirectorio
-        FOUND_BIN=$(find "$ODOO_PATH" -maxdepth 3 -name "odoo-bin" -type f 2>/dev/null | head -n 1)
+        # Buscar en cualquier subdirectorio (hasta profundidad 4)
+        FOUND_BIN=$(find "$ODOO_PATH" -maxdepth 4 -name "odoo-bin" -type f 2>/dev/null | grep -v venv | head -n 1)
         if [[ -n "$FOUND_BIN" ]]; then
             ODOO_BIN_PATH="$FOUND_BIN"
             log_success "odoo-bin encontrado en: $ODOO_BIN_PATH"
         else
             log_error "No se encontró odoo-bin en $ODOO_PATH"
-            log_error "Verifica la estructura del directorio:"
+            log_error "Estructura del directorio:"
             ls -la "$ODOO_PATH" | head -n 20
+            log_error "Intenta especificar la ruta con: --odoo-bin /ruta/al/odoo-bin"
             exit 1
         fi
     fi
