@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 
 # Configuración por defecto
 DB_USER="odoo"
-DB_PASSWORD="odoo_secure_pass_$(date +%s)"
+DB_PASSWORD="odoo"
 VERBOSE=false
 
 # Función para mostrar logs

@@ -121,8 +121,15 @@ fi
 
 if [[ "$TYPE" == "community" ]]; then
     log_info "Descargando desde: $URL"
-    if ! wget -O "$FILENAME" "$URL" 2>&1 | tail -n 3; then
+    if ! wget -O "$FILENAME" "$URL" 2>&1; then
         log_error "Error descargando Odoo"
+        rm -f "$FILENAME"
+        exit 1
+    fi
+    # Verificar que el archivo se descargó correctamente
+    if ! unzip -t "$FILENAME" > /dev/null 2>&1; then
+        log_error "Archivo descargado pero no es un ZIP válido"
+        rm -f "$FILENAME"
         exit 1
     fi
     log_success "Descarga completada"

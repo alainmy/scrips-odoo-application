@@ -24,10 +24,11 @@ DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="odoo"
 DB_USER="odoo"
-DB_PASSWORD="odoo_password"
-ADMIN_PASSWD="admin_password"
+DB_PASSWORD="odoo"
+ADMIN_PASSWD="Admin123*"
 WORKERS="2"
 XMLRPC_PORT="8069"
+GEVENT_PORT="8072"
 LOG_LEVEL="info"
 MAX_CRON_THREADS="1"
 
@@ -88,6 +89,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --xmlrpc-port)
             XMLRPC_PORT="$2"
+            shift 2
+            ;;
+        --gevent-port)
+            GEVENT_PORT="$2"
             shift 2
             ;;
         --log-level)
