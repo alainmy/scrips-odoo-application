@@ -19,7 +19,7 @@ NC='\033[0m'
 
 # Configuración por defecto
 ODOO_USER="odoo"
-ODOO_PATH="/opt/odoo/odoo"
+ODOO_PATH="/opt/odoo"
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="odoo"
@@ -57,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --odoo-path)
             ODOO_PATH="$2"
+            shift 2
+            ;;
+        --addons-path)
+            ADDONS_PATH="$2"
             shift 2
             ;;
         --db-host)
@@ -104,7 +108,8 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Opciones:"
             echo "  --user              Usuario Odoo (defecto: odoo)"
-            echo "  --odoo-path         Ruta de Odoo (defecto: /opt/odoo/odoo)"
+            echo "  --odoo-path         Ruta de Odoo (defecto: /opt/odoo)"
+            echo "  --addons-path       Ruta de addons (defecto: /opt/odoo/addons)"
             echo "  --db-host           Host de BD (defecto: localhost)"
             echo "  --db-port           Puerto de BD (defecto: 5432)"
             echo "  --db-name           Nombre de BD (defecto: odoo)"
@@ -188,7 +193,7 @@ db_password = $DB_PASSWORD
 db_name = $DB_NAME
 
 ; Rutas y logging
-addons_path = $ODOO_PATH/addons
+addons_path = /opt/odoo/addons,/opt/odoo/odoo/addons
 logfile = /var/log/odoo/odoo.log
 log_level = $LOG_LEVEL
 
